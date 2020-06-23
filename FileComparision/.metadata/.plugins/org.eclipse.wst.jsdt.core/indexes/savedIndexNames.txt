@@ -1,0 +1,8 @@
+INDEX VERSION 1.4+D:\Eclipse\wokspace\FileComparision\.metadata\.plugins\org.eclipse.wst.jsdt.core\indexes
+3230422860.index
+2697581640.index
+1344142130.index
+1227260327.index
+3793713116.index
+4191749905.index
+1239699630.index

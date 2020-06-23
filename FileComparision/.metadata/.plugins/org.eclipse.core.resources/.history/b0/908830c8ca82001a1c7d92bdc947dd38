@@ -1,0 +1,134 @@
+/**
+ * 
+ */
+package com.ofss.fileComparison.startup;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * @author rtgovind
+ *
+ */
+public class FileComparisonApp {
+
+	private static String oldDirectoryPath; //= "D:\\LOAN_SCREEN\\RAD";
+	private static String newDirectoryPath; //= "D:\\LOAN_SCREEN\\RADNEW";
+	private static String filesToBeDeployedDirectoryPath; //= "D:\\LOAN_SCREEN\\FilesToBeDeployed\\filesToBeDeployed_";
+	private static String destinationFolder;
+
+	public static void main(String[] args) {
+
+		try {
+			oldDirectoryPath = args[0];
+			newDirectoryPath = args[1];
+			filesToBeDeployedDirectoryPath = args[2];
+			destinationFolder = filesToBeDeployedDirectoryPath+"\\Deployables\\";
+			compareFiles(oldDirectoryPath, newDirectoryPath);
+		} catch (IOException e) {
+			System.out.println("ERROR : \n" + e.getMessage());
+		}
+
+	}
+
+	private static void compareFiles(String oldDirectoryPath, String newDirectoryPath) throws IOException {
+
+		Map<String, Map<String, File>> oldFilesByDirectory = getFiles(new File(oldDirectoryPath));
+		Map<String, Map<String, File>> newFilesByDirectory = getFiles(new File(newDirectoryPath));
+		Set<File> filesToBeDeployed = new HashSet<>();
+
+		newFilesByDirectory.forEach((dir, newFileSet) -> {
+			Map<String, File> oldFileSet = oldFilesByDirectory.getOrDefault(dir, new HashMap<>());
+			filesToBeDeployed.addAll(compare(oldFileSet, newFileSet, dir));
+		});
+
+		if (!filesToBeDeployed.isEmpty()) {
+			String dateFormat = new SimpleDateFormat("yyyy_MM_dd__HH_mm_ss").format(new Date());
+			PrintWriter writer = new PrintWriter(new File(filesToBeDeployedDirectoryPath+dateFormat+".txt"));
+			filesToBeDeployed.forEach(file -> {
+				writer.println("copy " + file + destinationFolder +file.getName());
+			});
+			writer.close();
+		}
+
+	}
+
+	private static Map<String, Map<String, File>> getFiles(File directory) {
+		Map<String, Map<String, File>> filesByDirectory = new HashMap<>();
+		Set<File> directories = Stream.of(directory.listFiles()).collect(Collectors.toSet());
+
+		directories.stream().forEach(dir -> {
+			Map<String, File> fileMap = new HashMap<>();
+
+			if (dir.getName().equals("UIXML")) {
+				Set<File> languageDirectories = Stream.of(dir.listFiles()).collect(Collectors.toSet());
+				languageDirectories.stream().forEach(langDir -> {
+					Stream.of(langDir.listFiles()).collect(Collectors.toSet()).forEach(file -> {
+						fileMap.put(file.getName(), file);
+					});
+				});
+			} else if (dir.isDirectory()) {
+				Stream.of(dir.listFiles()).collect(Collectors.toSet()).forEach(file -> {
+					fileMap.put(file.getName(), file);
+				});
+			}
+			filesByDirectory.put(dir.getName(), fileMap);
+		});
+
+		return filesByDirectory;
+	}
+
+	private static Set<File> compare(Map<String, File> oldFileSet, Map<String, File> newFileSet, String dir) {
+
+		Set<File> filesToBeDeployed = new HashSet<>();
+		newFileSet.forEach((fileName, newFile) -> {
+			boolean filesAreEqual = true;
+			File oldFile = oldFileSet.get(fileName);
+			try {
+				if (oldFile != null) {
+					BufferedReader oldFilesReader = new BufferedReader(new FileReader(oldFile));
+					BufferedReader newFilesReader = new BufferedReader(new FileReader(newFile));
+					String oldLine = oldFilesReader.readLine();
+					String newLine = newFilesReader.readLine();
+
+					while (oldLine != null || newLine != null) {
+
+						if ((oldLine == null && newLine != null) || (oldLine != null && newLine == null)
+								|| (!oldLine.equalsIgnoreCase(newLine))) {
+
+							filesAreEqual = false;
+							break;
+						}
+						oldLine = oldFilesReader.readLine();
+						newLine = newFilesReader.readLine();
+
+					}
+
+					oldFilesReader.close();
+					newFilesReader.close();
+				}
+
+				if (!filesAreEqual || oldFile == null) {
+					filesToBeDeployed.add(newFile);
+				}
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		});
+		
+		return filesToBeDeployed;
+	}
+
+}
